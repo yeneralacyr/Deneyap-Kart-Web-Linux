@@ -2,6 +2,7 @@ import json
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import config as InitialConfig
 from pathlib import Path
@@ -10,6 +11,41 @@ from DownloadGUI import startGUI
 from multiprocessing import Process
 
 ARDUINO_BOARD_URL = "https://raw.githubusercontent.com/deneyapkart/deneyapkart-arduino-core/master/package_deneyapkart_index.json"
+
+
+def _cli_prefix() -> str:
+    """Canli konsol akisi icin stdbuf ile satir tamponlu calistir (yoksa duz)."""
+    cli = get_arduino_cli()
+    if shutil.which("stdbuf"):
+        return f"stdbuf -oL -eL {cli}"
+    return cli
+
+
+def terminatePipe(pipe: "subprocess.Popen | None") -> None:
+    """Calisan derleme/yukleme surecini (ve torunlarini) guvenle oldur. Bitmisse no-op."""
+    if pipe is None:
+        return
+    try:
+        if pipe.poll() is None:
+            try:
+                os.killpg(os.getpgid(pipe.pid), signal.SIGTERM)
+            except Exception:
+                try:
+                    pipe.terminate()
+                except Exception:
+                    pass
+            try:
+                pipe.wait(timeout=5)
+            except Exception:
+                try:
+                    os.killpg(os.getpgid(pipe.pid), signal.SIGKILL)
+                except Exception:
+                    try:
+                        pipe.kill()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 
 def get_arduino_cli() -> str:
@@ -79,7 +115,9 @@ def executeCliPipe(command:str) -> subprocess.Popen:
     """
     cli = get_arduino_cli()
     logging.info(f"Executing pipe command {cli} {command}")
-    pipe = subprocess.Popen(f"{cli} {command}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    pipe = subprocess.Popen(f"{_cli_prefix()} {command}", shell=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            start_new_session=True)
     return pipe
 
 
@@ -95,7 +133,9 @@ def executeCli2Pipe(command:str) -> subprocess.Popen:
     """
     cli = get_arduino_cli()
     logging.info(f"Executing pipe command {cli} {command}")
-    pipe = subprocess.Popen(f"{cli} {command}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    pipe = subprocess.Popen(f"{_cli_prefix()} {command}", shell=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            start_new_session=True)
     return pipe
 
 def createFolder(fileDir:str) -> None:

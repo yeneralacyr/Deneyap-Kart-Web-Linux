@@ -4,11 +4,11 @@ import subprocess
 import os
 import config
 from DeviceChecker import DeviceChecker
-from utils import Data, downloadCore, updateIndex
+from utils import Data, downloadCore, updateIndex, terminatePipe
 from Board import Board
 from multiprocessing import Queue
 import logging
-from websockets.exceptions import ConnectionClosedOK
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosed
 import websockets
 import websockets.legacy.server  # annotation icin yan yukleme (websockets.legacy)
 from LibraryDownloader import searchLibrary, installLibrary
@@ -48,11 +48,20 @@ class Websocket(aobject):
         Data.websockets.append(self)
         self.websocket = websocket
         self.queue = Queue()
+        self.current_pipe = None  # suren derleme/yukleme; baglanti koparsa oldurulur
 
         self.deviceChecker = DeviceChecker(self.queue)
         self.deviceChecker.start()
 
         await self.mainLoop()
+
+    async def _sendSafe(self, bodyToSend: str) -> bool:
+        """Kapali sokete yazmayi denerse False don (baglanti kopmus)."""
+        try:
+            await self.websocket.send(bodyToSend)
+            return True
+        except ConnectionClosed:
+            return False
 
     async def readAndSend(self, pipe: subprocess.Popen) -> None:
         """
@@ -62,23 +71,44 @@ class Websocket(aobject):
         :type pipe: subprocess.Popen
         """
 
-        allText = ""
-        for c in iter(lambda: pipe.stdout.readline(), b''):
-            t = c.decode("utf-8")
-            allText += t
+        async def heartbeat():
+            # uzun derlemelerde konsol sessiz kalmasin: kullanici "takildi" sanip
+            # sayfayi yenilemesin diye periyodik canlilik mesaji gonder
+            elapsed = 0
+            try:
+                while True:
+                    await asyncio.sleep(20)
+                    elapsed += 20
+                    alive = {"command": "consoleLog",
+                             "log": f"[agent] islem suruyor ({elapsed} sn)...\n"}
+                    if not await self._sendSafe(json.dumps(alive)):
+                        break
+            except asyncio.CancelledError:
+                pass
+
+        hb = asyncio.ensure_future(heartbeat())
+        try:
+            allText = ""
+            t = ""
+            for c in iter(lambda: pipe.stdout.readline(), b''):
+                t = c.decode("utf-8")
+                allText += t
+                bodyToSend = {"command": "consoleLog", "log": t}
+                bodyToSend = json.dumps(bodyToSend)
+                if not await self._sendSafe(bodyToSend):
+                    return
+                await asyncio.sleep(0)
+
+            if pipe.communicate()[1]:
+                t = pipe.communicate()[1].decode("utf-8")
+                allText += t
+
             bodyToSend = {"command": "consoleLog", "log": t}
             bodyToSend = json.dumps(bodyToSend)
-            await self.websocket.send(bodyToSend)
-            await asyncio.sleep(0)
-
-        if pipe.communicate()[1]:
-            t = pipe.communicate()[1].decode("utf-8")
-            allText += t
-
-        bodyToSend = {"command": "consoleLog", "log": t}
-        bodyToSend = json.dumps(bodyToSend)
-        logging.info(f"Pipe output {allText}")
-        await self.websocket.send(bodyToSend)
+            logging.info(f"Pipe output {allText}")
+            await self._sendSafe(bodyToSend)
+        finally:
+            hb.cancel()
 
     async def commandParser(self, body: dict) -> None:
         """
@@ -246,12 +276,16 @@ class Websocket(aobject):
 
         board = Data.boards[port]
         pipe = board.uploadCode(code, fqbn, uploadOptions)
+        self.current_pipe = pipe
 
-
-        bodyToSend = {"command": "cleanConsoleLog", "log": ""}
-        bodyToSend = json.dumps(bodyToSend)
-        await self.websocket.send(bodyToSend)
-        await self.readAndSend(pipe)
+        try:
+            bodyToSend = {"command": "cleanConsoleLog", "log": ""}
+            bodyToSend = json.dumps(bodyToSend)
+            await self.websocket.send(bodyToSend)
+            await self.readAndSend(pipe)
+        finally:
+            self.current_pipe = None
+            terminatePipe(pipe)
 
     async def getVersion(self) -> None:
         """
@@ -294,11 +328,16 @@ class Websocket(aobject):
         """
 
         pipe = Board.compileCode(code, fqbn, uploadOptions)
+        self.current_pipe = pipe
 
-        bodyToSend = {"command": "cleanConsoleLog", "log": "Compling Code...\n"}
-        bodyToSend = json.dumps(bodyToSend)
-        await self.websocket.send(bodyToSend)
-        await self.readAndSend(pipe)
+        try:
+            bodyToSend = {"command": "cleanConsoleLog", "log": "Compling Code...\n"}
+            bodyToSend = json.dumps(bodyToSend)
+            await self.websocket.send(bodyToSend)
+            await self.readAndSend(pipe)
+        finally:
+            self.current_pipe = None
+            terminatePipe(pipe)
 
     async def getBoards(self) -> None:
         """
@@ -344,5 +383,8 @@ class Websocket(aobject):
         except:
             logging.exception("Websocket Mainloop: ")
         finally:
+            # baglanti koptuysa yarim kalan derleme/yukleme portu kilitlemesin
+            terminatePipe(self.current_pipe)
+            self.current_pipe = None
             self.deviceChecker.terminate()
             self.deviceChecker.process.join()
