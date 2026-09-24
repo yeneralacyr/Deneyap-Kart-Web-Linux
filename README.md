@@ -1,5 +1,7 @@
 <p align="center">
   <img src="assets/meu-logo.png" alt="Mersin Üniversitesi" width="140" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/deneyap-logo.png" alt="Deneyap" width="140" />
 </p>
 
 <h1 align="center">Deneyap Kart Web Agent — Linux</h1>
