@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Deneyap Kart Web Agent
+Comment=Deneyap Bloklar web arayuzu ile kart arasinda websocket koprusu
+Exec=deneyap-web-agent
+Icon=deneyap-web-agent
+Terminal=false
+Categories=Development;Electronics;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

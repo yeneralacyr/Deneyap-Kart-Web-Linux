@@ -1,0 +1,5 @@
+websockets==10.3
+appdirs==1.4.4
+pyserial==3.5
+pystray==0.19.3
+Pillow>=9.0
