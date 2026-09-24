@@ -12,8 +12,9 @@
 </p>
 
 <p align="center">
-  <b>Mersin Üniversitesi</b> kapsamında geliştirilmiştir —
-  Dr. Öğr. Üyesi <b>Erman Uzun</b> ile birlikte.
+  <b>Mersin Üniversitesi</b> kapsamında,
+  <br />
+  Proje Yürütücüsü Dr. Öğr. Üyesi <b>Erman Uzun</b> liderliğinde geliştirilmiştir.
 </p>
 
 ---
@@ -48,6 +49,11 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 Sonra Deneyap Blok sayfasını açıp kartı seçin (`/dev/ttyUSB0` vb.) ve yükleyin.
 Bayraklar: `--no-tray` (traysiz mod), `--no-setup` (ilk kurulumu atla).
 Teknik detaylar için [`README_LINUX.md`](README_LINUX.md).
+
+## Proje ekibi
+
+- **Proje Yürütücüsü:** Dr. Öğr. Üyesi Erman Uzun — Mersin Üniversitesi
+- **Geliştirme:** Mersin Üniversitesi kapsamında yürütülmüştür.
 
 ## Kaynak ve lisans
 
