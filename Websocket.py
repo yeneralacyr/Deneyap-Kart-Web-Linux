@@ -274,7 +274,16 @@ class Websocket(aobject):
         :type uploadOptions: str
         """
 
-        board = Data.boards[port]
+        board = Data.boards.get(port)
+        if board is None:
+            # kart takili degil ya da liste guncel degil: sessizce olmek yerine
+            # konsola anlasilir hata yaz
+            await self._sendSafe(json.dumps({"command": "cleanConsoleLog", "log": ""}))
+            await self._sendSafe(json.dumps({
+                "command": "consoleLog",
+                "log": f"[agent] HATA: {port} bulunamadi. Kart takili mi? Port listesini yenileyip tekrar deneyin.\n",
+            }))
+            return
         pipe = board.uploadCode(code, fqbn, uploadOptions)
         self.current_pipe = pipe
 
