@@ -14,7 +14,7 @@
 <p align="center">
   <b>Mersin Üniversitesi</b> kapsamında,
   <br />
-  Proje Yürütücüsü Dr. Öğr. Üyesi <b>Erman Uzun</b> liderliğinde geliştirilmiştir.
+  Proje Yürütücüsü Dr. Öğr. Üyesi <b>Erman Uzun</b> önderliğinde geliştirilmiştir.
 </p>
 
 ---
